@@ -1,8 +1,11 @@
-/**
- * @note    gcc -DTEST -I../include -g -o dbmtest dbmtest.c ../src/utilities.c -llmdb
- */
-#include "../src/db.c"
-#include "pthread.h"
+#include <stdio.h>
+#include <assert.h>
+#include <unistd.h>
+#include <string.h>
+#include <stdlib.h>
+#include <pthread.h>
+
+#include "../db.h"
 
 #define NUM_THREADS 14
 #define LMDB_DEFAULT_READERS 126
@@ -21,27 +24,27 @@ void *read_thread_function(void *arg) {
     TrashTxn *tt1,*tt2,*tt3;
     MDB_val key,val;
 
-    assert(trash_txn(&tt1, "db1", TRASH_RD_TXN) == TRASH_SUCCESS);
-    assert(trash_txn(&tt2, "db2", TRASH_RD_TXN) == TRASH_SUCCESS);
-    assert(trash_txn(&tt3, "db3", TRASH_RD_TXN) == TRASH_SUCCESS);
+    assert(trash_txn(&tt1, "db1", TRASH_RD_TXN) == TRASH_DB_SUCCESS);
+    assert(trash_txn(&tt2, "db2", TRASH_RD_TXN) == TRASH_DB_SUCCESS);
+    assert(trash_txn(&tt3, "db3", TRASH_RD_TXN) == TRASH_DB_SUCCESS);
 
     char res[8] = {0};
 
     key.mv_data = "testkey1";
     key.mv_size = 8;
-    assert(trash_get(tt1, &key, &val) == TRASH_SUCCESS);
+    assert(trash_get(tt1, &key, &val) == TRASH_DB_SUCCESS);
     memcpy(&res, (char *)val.mv_data, val.mv_size);
     assert(strcmp("testval1", res) == 0);
 
     key.mv_data = "testkey2";
     key.mv_size = 8;
-    assert(trash_get(tt2, &key, &val) == TRASH_SUCCESS);
+    assert(trash_get(tt2, &key, &val) == TRASH_DB_SUCCESS);
     memcpy(&res, (char *)val.mv_data, val.mv_size);
     assert(strcmp("testval2", res) == 0);
 
     key.mv_data = "testkey3";
     key.mv_size = 8;
-    assert(trash_get(tt3, &key, &val) == TRASH_SUCCESS);
+    assert(trash_get(tt3, &key, &val) == TRASH_DB_SUCCESS);
     memcpy(&res, (char *)val.mv_data, val.mv_size);
     assert(strcmp("testval3", res) == 0);
 
@@ -66,17 +69,17 @@ void *write_thread_function(void *arg) {
     dbmeta.flags = MDB_CREATE;
     dbmeta.name = "db1";
     dbmeta.slots = 1;
-    assert(write_db_meta(&dbmeta) == TRASH_SUCCESS);
+    assert(write_db_meta(&dbmeta) == TRASH_DB_SUCCESS);
 
     dbmeta.flags = MDB_CREATE;
     dbmeta.name = "db2";
     dbmeta.slots = 1;
-    assert(write_db_meta(&dbmeta) == TRASH_SUCCESS);
+    assert(write_db_meta(&dbmeta) == TRASH_DB_SUCCESS);
 
     dbmeta.flags = MDB_CREATE;
     dbmeta.name = "db3";
     dbmeta.slots = 1;
-    assert(write_db_meta(&dbmeta) == TRASH_SUCCESS);
+    assert(write_db_meta(&dbmeta) == TRASH_DB_SUCCESS);
 
     TrashTxn *tt;
     MDB_val key,val;
@@ -85,8 +88,8 @@ void *write_thread_function(void *arg) {
     key.mv_size = 8;
     val.mv_data = "testval1";
     val.mv_size = 8;
-    assert(trash_txn(&tt, "db1", TRASH_WR_TXN) == TRASH_SUCCESS);
-    assert(trash_put(tt, &key, &val, 0) == TRASH_SUCCESS);
+    assert(trash_txn(&tt, "db1", TRASH_WR_TXN) == TRASH_DB_SUCCESS);
+    assert(trash_put(tt, &key, &val, 0) == TRASH_DB_SUCCESS);
 
     change_txn_db(tt, "db2");
 
@@ -94,7 +97,7 @@ void *write_thread_function(void *arg) {
     key.mv_size = 8;
     val.mv_data = "testval2";
     val.mv_size = 8;
-    assert(trash_put(tt, &key, &val, 0) == TRASH_SUCCESS);
+    assert(trash_put(tt, &key, &val, 0) == TRASH_DB_SUCCESS);
 
     change_txn_db(tt, "db3");
 
@@ -102,7 +105,7 @@ void *write_thread_function(void *arg) {
     key.mv_size = 8;
     val.mv_data = "testval3";
     val.mv_size = 8;
-    assert(trash_put(tt, &key, &val, 0) == TRASH_SUCCESS);
+    assert(trash_put(tt, &key, &val, 0) == TRASH_DB_SUCCESS);
 
     return_txn(tt);
 
@@ -116,7 +119,7 @@ int main(int argc, char *argv[]) {
     pthread_t threads[NUM_THREADS];
     int rc;
 
-    assert(open_env(DB_SIZE, NUM_DBS, LMDB_DEFAULT_READERS) == 0);
+    assert(open_env(TRASH_DB_SIZE, TRASH_NUM_DBS, LMDB_DEFAULT_READERS) == 0);
 
     for (int i = 0; i < NUM_THREADS; i++) {
         void *(*func)(void *);

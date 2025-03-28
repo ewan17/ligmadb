@@ -1,8 +1,13 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <pthread.h>
+#include <string.h>
+#include <assert.h>
 
 #include "db.h"
+
+#include "c-utils/utilities.h"
+#include "c-utils/il.h"
 
 #define METADATA_FLAGS MDB_CREATE
 
@@ -107,8 +112,6 @@ static struct OpenEnv *oEnv = NULL;
 static __thread struct Readers *rdrPool = NULL;
 
 void init_thread_local_readers(size_t numrdrs) {
-    MDB_cursor *curr;
-    struct OpenDb *metadb;
     int rc;
 
     if(rdrPool != NULL)
@@ -278,9 +281,6 @@ int change_txn_db(TrashTxn *tt, const char *dbname) {
 }
 
 void return_txn(TrashTxn *tt) {
-    struct OpenDb *db;
-    struct IL *curr;
-
     if(tt == NULL)
         return;
 
@@ -479,7 +479,6 @@ int write_db_meta(struct DbMeta *dbmeta) {
  * @todo    flags need to be checked with how the dbi was opened initially
  */
 int trash_put(TrashTxn *tt, MDB_val *key, MDB_val *val, unsigned int flags) {
-    MDB_val keyData, valData;
     struct OpenDb *db;
     int rc;
     
@@ -534,11 +533,8 @@ static void init_metadata() {
     TrashTxn *tt;
     MDB_txn *txn;
     MDB_dbi dbi;
-    MDB_val key, val;
-    MDB_cursor *curr;
     struct OpenDb *db;
     struct DbMeta dbmeta;
-    unsigned int numrdrs;
     int rc;
 
     rc = mdb_txn_begin(oEnv->env, NULL, 0, &txn);
@@ -591,7 +587,6 @@ static void internal_open_all_db(TrashTxn *tt) {
     while((rc = mdb_cursor_get(curr, &key, &val, op)) == 0) {
         struct OpenDb *db;
         char *dbKeyName;
-        char *dbname;
 
         dbKeyName = (char *)key.mv_data;
         rc = memcmp(dbKeyName, DB_PREFIX, DB_PREFIX_LEN);
@@ -701,7 +696,7 @@ static struct OpenDb *internal_get_open_db(const char *dbname) {
     for_each(&oEnv->dbs.head, curr) {
         struct OpenDb *tempdb;
         tempdb = CONTAINER_OF(curr, struct OpenDb, moveenv);
-        if(db_match(tempdb, dbname) == TRASH_SUCCESS) {
+        if(db_match(tempdb, dbname) == TRASH_DB_SUCCESS) {
             db = tempdb;
             break;
         }
@@ -711,15 +706,13 @@ static struct OpenDb *internal_get_open_db(const char *dbname) {
 }
 
 static void internal_create_open_env(struct OpenEnv **oEnv, MDB_env *env) {
-    int rc;
-
     *oEnv = (struct OpenEnv *)malloc(sizeof(struct OpenEnv));
     assert((*oEnv) != NULL);
 
     (*oEnv)->env = env;
     init_list(&(*oEnv)->dbs);
 
-    rc = pthread_rwlock_init(&(*oEnv)->envLock, NULL);
+    pthread_rwlock_init(&(*oEnv)->envLock, NULL);
 
     (*oEnv)->envFlags = mdb_env_get_flags(env, &(*oEnv)->envFlags);
     (*oEnv)->state = ENV_OPEN;

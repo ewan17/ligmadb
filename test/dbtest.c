@@ -1,7 +1,6 @@
-/**
- * @note    gcc -DTEST -I../include -g -o dbtest dbtest.c ../src/utilities.c -llmdb
- */
-#include "../src/db.c"
+#include <string.h>
+
+#include "../db.c"
 
 const char *filename = "dbtest/";
 
@@ -13,18 +12,18 @@ void db_test1() {
     const char *dbname = "test1";
     const char *notdbname = "not_test";
 
-    dbmeta = (struct DbMeta *)trash_malloc(sizeof(struct DbMeta));
+    dbmeta = (struct DbMeta *)malloc(sizeof(struct DbMeta));
     dbmeta->flags = MDB_CREATE;
     dbmeta->name = dbname;
     dbmeta->slots = 1;
 
-    assert(trash_txn(&tt, METADATA, TRASH_RD_TXN) == TRASH_SUCCESS);
+    assert(trash_txn(&tt, METADATA, TRASH_RD_TXN) == TRASH_DB_SUCCESS);
     assert(strcmp(METADATA, tt->dbs[tt->dbscount - 1]->name) == 0);
 
     assert(change_txn_db(tt, notdbname) == TRASH_DB_DNE);
 
-    assert(write_db_meta(dbmeta) == TRASH_SUCCESS);
-    assert(change_txn_db(tt, dbname) == TRASH_SUCCESS);
+    assert(write_db_meta(dbmeta) == TRASH_DB_SUCCESS);
+    assert(change_txn_db(tt, dbname) == TRASH_DB_SUCCESS);
     assert(strcmp(dbname, tt->dbs[tt->dbscount - 1]->name) == 0);
 
     return_txn(tt);
@@ -43,25 +42,24 @@ void db_test2() {
     MDB_val key,val,res;
     struct DbMeta *dbmeta;
     char result[256];
-    int rc;
 
     const char *dbname = "test2";
 
-    dbmeta = (struct DbMeta *)trash_malloc(sizeof(struct DbMeta));
+    dbmeta = (struct DbMeta *)malloc(sizeof(struct DbMeta));
     dbmeta->flags = MDB_CREATE;
     dbmeta->name = dbname;
     dbmeta->slots = 1;
 
     assert(trash_txn(&tt, dbname, TRASH_WR_TXN) == TRASH_DB_DNE);
-    assert(write_db_meta(dbmeta) == TRASH_SUCCESS);
+    assert(write_db_meta(dbmeta) == TRASH_DB_SUCCESS);
     free(dbmeta);
 
     key.mv_data = "testkey";
     key.mv_size = 7;
     val.mv_data = "testval";
     val.mv_size = 7;
-    assert(trash_txn(&tt, dbname, TRASH_WR_TXN) == TRASH_SUCCESS);
-    assert(trash_put(tt, &key, &val, 0) == TRASH_SUCCESS);
+    assert(trash_txn(&tt, dbname, TRASH_WR_TXN) == TRASH_DB_SUCCESS);
+    assert(trash_put(tt, &key, &val, 0) == TRASH_DB_SUCCESS);
 
     return_txn(tt);
 
@@ -90,9 +88,8 @@ void db_test3() {
     TrashTxn *tt;
     TrashCursor *tc;
     MDB_val key, val;
-    int rc;
 
-    assert(trash_txn(&tt, METADATA, TRASH_WR_TXN) == TRASH_SUCCESS);
+    assert(trash_txn(&tt, METADATA, TRASH_WR_TXN) == TRASH_DB_SUCCESS);
     assert(trash_cursor(&tc, tt) == TRASH_DB_SUCCESS);
     for(unsigned int i = 0; i < 10; i++) {
         char keybuf[5];
@@ -105,13 +102,13 @@ void db_test3() {
         key.mv_size = sizeof(keybuf);
         val.mv_data = valbuf;
         val.mv_size = sizeof(valbuf);
-        assert((rc = trash_cur_put(tc, &key, &val, MDB_NOOVERWRITE)) == 0);
+        assert((trash_cur_put(tc, &key, &val, MDB_NOOVERWRITE)) == 0);
     }
 
     return_cursor(tc);
     return_txn(tt);
 
-    assert(trash_txn(&tt, METADATA, TRASH_RD_TXN) == TRASH_SUCCESS);
+    assert(trash_txn(&tt, METADATA, TRASH_RD_TXN) == TRASH_DB_SUCCESS);
     assert(trash_cursor(&tc, tt) == TRASH_DB_SUCCESS);
 
     key.mv_size = 3;
@@ -136,7 +133,7 @@ void db_test3() {
 }
 
 int main(int argc, char *argv[]) {
-    assert(open_env(DB_SIZE, NUM_DBS, 3) == 0);
+    assert(open_env(TRASH_DB_SIZE, TRASH_NUM_DBS, 3) == 0);
 
     init_thread_local_readers(2);
 
