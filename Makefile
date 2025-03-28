@@ -29,6 +29,7 @@ lib:
 	@mkdir -p $(LIB_DIR)
 
 libutils.a:
+	git submodule update --init --recursive
 	$(MAKE) -C c-utils
 	cp -r c-utils/lib/libutils.a $(LIB_DIR)/
 
